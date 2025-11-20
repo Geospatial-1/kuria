@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin Dashboard — Bunge huru initiative</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg nav-glass">
+    <div class="container"><a class="navbar-brand" href="/">Hon Gisiri</a></div>
+  </nav>
+
+  <main class="container mt-4">
+    <h1>Admin Dashboard</h1>
+    <p class="text-muted">Only visible to admin UIDs listed in the <code>admins</code> collection in Firestore.</p>
+
+    <div id="adminArea" style="display:none">
+      <h3>Pending Registrations</h3>
+      <div id="registrations"></div>
+
+      <h3 class="mt-4">Resource Requests</h3>
+      <div id="resRequests"></div>
+
+      <h3 class="mt-4">Posts / Events</h3>
+      <div id="postsList"></div>
+    </div>
+
+    <div id="notAdmin" class="alert alert-warning">Checking admin status... please login on main site first.</div>
+  </main>
+
+  <script type="module" src="firebase-init.js"></script>
+  <script type="module">
+    import { db } from './firebase-init.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js';
+    import { collection, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js';
+
+    const auth = getAuth();
+    onAuthStateChanged(auth, async user=>{
+      if(!user){ document.getElementById('notAdmin').textContent = 'Please login first (open main site and login)'; return; }
+      // check admins collection for doc with id == uid
+      const adminsSnap = await getDocs(collection(db,'admins'));
+      const uids = adminsSnap.docs.map(d=>d.id);
+      if(uids.includes(user.uid)){
+        document.getElementById('adminArea').style.display='block';
+        document.getElementById('notAdmin').style.display='none';
+
+        // load registrations
+        const regSnap = await getDocs(query(collection(db,'registrations'), orderBy('createdAt','desc')));
+        const rDiv = document.getElementById('registrations'); rDiv.innerHTML='';
+        regSnap.forEach(doc=>{ const d=doc.data(); rDiv.insertAdjacentHTML('beforeend', `<div class="card p-2 mb-2"><strong>${d.name}</strong><div>${d.email} · ${d.phone}</div><small class="text-muted">${d.createdAt}</small></div>`)})
+
+        // resource requests
+        const rrSnap = await getDocs(query(collection(db,'resourceRequests'), orderBy('ts','desc')));
+        const rrDiv = document.getElementById('resRequests'); rrDiv.innerHTML='';
+        rrSnap.forEach(doc=>{ const d=doc.data(); rrDiv.insertAdjacentHTML('beforeend', `<div class="card p-2 mb-2"><strong>${d.name}</strong><div>${d.email}</div><div>${d.desc}</div></div>`)})
+
+        // posts
+        const postsSnap = await getDocs(query(collection(db,'posts'), orderBy('createdAt','desc')));
+        const postsDiv = document.getElementById('postsList'); postsDiv.innerHTML='';
+        postsSnap.forEach(doc=>{ const d=doc.data(); postsDiv.insertAdjacentHTML('beforeend', `<div class="card p-2 mb-2"><strong>${d.title||'Post'}</strong><div>${d.author||''}</div><div>${d.status||'pending'}</div></div>`)})
+
+      } else {
+        document.getElementById('notAdmin').style.display='block';
+      }
+    });
+  </script>
+</body>
+</html>
